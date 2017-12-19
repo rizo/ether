@@ -1,0 +1,16 @@
+opam-version: "1.2"
+maintainer: "Rizo Isrof <rizo@odis.io>"
+authors: ["Rizo Isrof <rizo@odis.io>"]
+homepage: "https://github.com/rizo/ether"
+doc: "http://rizo.odis.io/ether/doc"
+license: "ISC"
+dev-repo: "https://github.com/rizo/ether.git"
+bug-reports: "https://github.com/rizo/ether/issues"
+tags: []
+available: [ ocaml-version >= "4.01.0"]
+depends: [
+  "jbuilder" {build}
+]
+build: [[
+  "jbuilder" "build" "--only-packages" "%{name}%" "--root" "." "-j" jobs "@install"
+]]

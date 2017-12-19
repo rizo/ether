@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name Ether)
+  (public_name ether)
+  (wrapped false)
+  (modules (Ether))))
+
