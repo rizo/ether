@@ -1,4 +1,4 @@
-# Ether - The base element
+# Ether – The base element
 
 *Ether* is small base library for OCaml designed from the ground up for
 consistent, safe and user-friendly development experience.
