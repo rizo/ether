@@ -33,7 +33,7 @@ instructions.
 ## Documentation
 
 The documentation and API reference is generated from the source
-interfaces. It can be consulted [online][http://odis.io/docs/ether/Ether] or via `odig doc
+interfaces. It can be consulted [online](http://odis.io/docs/ether/Ether) or via `odig doc
 ether`.
 
 
