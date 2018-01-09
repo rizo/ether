@@ -22,7 +22,7 @@ library. Stable language features are preferred.
 
 ## Installation
 
-iter can be installed with `opam`:
+This library can be installed with `opam`:
 
     opam install ether
 
