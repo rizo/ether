@@ -6,6 +6,19 @@
 (** {e Ether} is small base library for OCaml designed from the ground up for
     consistent, safe and user-friendly development experience.
 
+    {3:goals Goals}
+
+    {ul
+    {- {b Consistency and predictability} on all levels is enforced by
+    following {{: #naming-conventions} naming} and structural conventions.}
+    {- {b Simplicity} at the point of usage. Interfaces are defined once but
+    used repeatedly. The exported API must be simple and understandable,
+    optimized for the context in which it will be used.}
+    {- {b Composability} of the components. The modules, types and interfaces
+    are expected to be flexible and mixed in new ways.}
+    {- {b Portability:} no external dependencies apart from the standard
+    library. Stable language features are preferred.}}
+
     This documentation includes the implemented API reference and describes the
     design conventions adopted and recommended by the library.
 
