@@ -41,178 +41,184 @@ let bracket init (free : 'a -> unit) f =
 (* Comparisons and Ordering *)
 
 module type Equatable = sig
-  type t
+  type self
 
-  val equal : t -> t -> bool
-  val (=)  : t -> t -> bool
-  val (<>)  : t -> t -> bool
+  val equal : self -> self -> bool
+  val (==)  : self -> self -> bool
+  val (!=)  : self -> self -> bool
 end
 
 
 module Equatable = struct
   module type Base = sig
-    type t
+    type self
 
-    val equal : t -> t -> bool
+    val equal : self -> self -> bool
   end
 
-  module Make(B : Base) : (Equatable with type t := B.t) = struct
+  module Make(B : Base) : (Equatable with type self := B.self) = struct
     include B
 
-    let (=)  a b = equal a b
-    let (<>) a b = not (equal a b)
+    let (==)  a b = equal a b
+    let (!=) a b = not (equal a b)
   end
 end
 
 
 module type Equatable1 = sig
-  type 'a t
+  type 'a self
 
-  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+  val equal : ('a -> 'a -> bool) -> 'a self -> 'a self -> bool
 end
 
 
 module type Equatable2 = sig
-  type ('a, 'b) t
+  type ('a, 'b) self
 
   val equal :
     ('a -> 'a -> bool) ->
-    ('b -> 'b -> bool) -> ('a, 'b) t -> ('a, 'b) t -> bool
+    ('b -> 'b -> bool) -> ('a, 'b) self -> ('a, 'b) self -> bool
 end
 
 
-type order = int
+type order =
+  | Less
+  | Equal
+  | Greater
+
+type 'a comparator = 'a -> 'a -> order
 
 module type Comparable = sig
-  type t
+  type self
 
-  include Equatable with type t := t
+  include Equatable with type self := self
 
-  val compare : t -> t -> order
-  val ( <  ) : t -> t -> bool
-  val ( >  ) : t -> t -> bool
-  val ( <= ) : t -> t -> bool
-  val ( >= ) : t -> t -> bool
-  val min : t -> t -> t
-  val max : t -> t -> t
+  val compare : self -> self -> order
+  val ( <  ) : self -> self -> bool
+  val ( >  ) : self -> self -> bool
+  val ( <= ) : self -> self -> bool
+  val ( >= ) : self -> self -> bool
+  val min : self -> self -> self
+  val max : self -> self -> self
 end
 
 
 module Comparable = struct
-  let less    = -1
-  let equal   =  0
-  let greater = +1
-
-  let is_less    a ~than:b = compare a b = less
-  let is_greater a ~than:b = compare a b = greater
-
   module type Base = sig
-    type t
+    type self
 
-    val compare : t -> t -> order
+    val compare : self -> self -> order
   end
 
-  module Make(B : Base) : (Comparable with type t := B.t) = struct
-    include B
-
+  module Make(B : Base) : (Comparable with type self := B.self) = struct
     include Equatable.Make(struct
-        type nonrec t = t
-        let equal a b = P.(=) (B.compare a b) equal
+        type nonrec self = B.self
+        let equal a b =
+          match B.compare a b with
+          | Equal -> true
+          | Less | Greater -> false
       end)
 
-    let ( <  ) a b = P.(= ) (B.compare a b) less
-    let ( >  ) a b = P.(= ) (B.compare a b) greater
-    let ( <= ) a b = P.(<>) (B.compare a b) greater
-    let ( >= ) a b = P.(= ) (B.compare a b) less
+    let compare = B.compare
 
-    let min a b = if P.(=) (compare a b) less    then a else b
-    let max a b = if P.(=) (compare a b) greater then a else b
+    let ( < ) a b =
+      match B.compare a b with
+      | Less -> true
+      | Equal | Greater -> false
+
+    let ( > ) a b =
+      match B.compare a b with
+      | Greater -> true
+      | Less | Equal -> false
+
+    let ( <= ) a b = not (a > b)
+    let ( >= ) a b = not (a < b)
+
+    let min a b = if a < b then a else b
+    let max a b = if a > b then a else b
   end
 end
 
 
 module type Comparable1 = sig
-  type 'a t
+  type 'a self
 
   val compare :
-    ('a -> 'a -> order) -> 'a t -> 'a t -> order
+    'a comparator -> 'a self -> 'a self -> order
 
-  val min : ('a -> 'a -> order) -> 'a t -> 'a t -> 'a t
+  val min : 'a comparator -> 'a self -> 'a self -> 'a self
 
-  val max : ('a -> 'a -> order) -> 'a t -> 'a t -> 'a t
+  val max : 'a comparator -> 'a self -> 'a self -> 'a self
 end
 
 
 module Comparable1 = struct
   module type Base = sig
-    type 'a t
+    type 'a self
 
-    val compare :
-      ('a -> 'a -> order) -> 'a t -> 'a t -> order
+    val compare : 'a comparator -> 'a self -> 'a self -> order
   end
 
-  module Make(B : Base) : (Comparable1 with type 'a t := 'a B.t) = struct
-    include B
+  module Make(B : Base) : (Comparable1 with type 'a self := 'a B.self) = struct
+    let compare = B.compare
 
-    let min cmp a b = if compare cmp a b = Comparable.less    then a else b
-    let max cmp a b = if compare cmp a b = Comparable.greater then a else b
+    let min cmp a b =
+      match B.compare cmp a b with
+      | Less -> a
+      | Equal | Greater -> b
+
+    let max cmp a b =
+      match B.compare cmp a b with
+      | Greater -> a
+      | Equal | Less -> b
   end
 end
 
 
 module type Comparable2 = sig
-  type ('a, 'b) t
+  type ('a, 'b) self
 
   val compare :
-    ('a -> 'a -> order) ->
-    ('b -> 'b -> order) -> ('a, 'b) t -> ('a, 'b) t ->
+    'a comparator -> 'b comparator ->
+    ('a, 'b) self -> ('a, 'b) self ->
     order
 
   val min :
-    ('a -> 'a -> order) ->
-    ('b -> 'b -> order) -> ('a, 'b) t -> ('a, 'b) t -> ('a, 'b) t
+    'a comparator -> 'b comparator ->
+    ('a, 'b) self -> ('a, 'b) self -> ('a, 'b) self
 
   val max :
-    ('a -> 'a -> order) ->
-    ('b -> 'b -> order) -> ('a, 'b) t -> ('a, 'b) t -> ('a, 'b) t
+    'a comparator -> 'b comparator ->
+    ('a, 'b) self -> ('a, 'b) self -> ('a, 'b) self
 end
 
 
 module Comparable2 = struct
   module type Base = sig
-    type ('a, 'b) t
+    type ('a, 'b) self
 
     val compare :
-      ('a -> 'a -> order) ->
-      ('b -> 'b -> order) -> ('a, 'b) t -> ('a, 'b) t ->
+      'a comparator -> 'b comparator ->
+      ('a, 'b) self -> ('a, 'b) self ->
       order
   end
 
-  module Make(B : Base) :
-    Comparable2 with type ('a, 'b) t := ('a, 'b) B.t = struct
+  module Make(B : Base) : Comparable2 with type ('a, 'b) self := ('a, 'b) B.self = struct
+    let compare = B.compare
 
-    include B
+    let min cmp_a cmp_b a b =
+      match B.compare cmp_a cmp_b a b with
+      | Less -> a
+      | Equal | Greater -> b
 
-    let min cmp1 cmp2 a b = if compare cmp1 cmp2 a b = Comparable.less    then a else b
-    let max cmp1 cmp2 a b = if compare cmp1 cmp2 a b = Comparable.greater then a else b
+    let max cmp_a cmp_b a b =
+      match B.compare cmp_a cmp_b a b with
+      | Greater -> a
+      | Equal | Less -> b
   end
 end
 
-
-let compare = P.compare
-let equal = P.( = )
-
-let ( = ) = P.( =  )
-let ( <> ) = P.( <> )
-let ( <  ) = P.( <  )
-let ( >  ) = P.( >  )
-let ( <= ) = P.( <= )
-let ( >= ) = P.( >= )
-
-let min = P.min
-let max = P.max
-
-let is = P.( = )
+let is = P.( == )
 
 
 (* Formatting and Pretty-printing *)
@@ -221,32 +227,37 @@ type 'a printer = Format.formatter -> 'a -> unit
 
 let format = Format.asprintf
 
-let print ?(output = P.stdout) ?(break = "\n") str =
-  P.output_string output (str ^ break)
+let print ?(output = Pervasives.stdout) ?(break = "\n") fmt =
+  let open Format in
+  let formatter = formatter_of_out_channel output in
+  let pp_break formatter =
+    pp_print_string formatter break;
+    pp_print_flush formatter () in
+  kfprintf pp_break formatter fmt
 
 
 module type Printable = sig
-  type t
+  type self
 
-  val pp : t printer
+  val pp : self printer
 
-  val show : t -> string
+  val to_string : self -> string
 
-  val print : t -> unit
+  val print : self -> unit
 end
 
 
 module Printable = struct
   module type Base = sig
-    type t
+    type self
 
-    val pp : t printer
+    val pp : self printer
   end
 
-  module Make(B : Base) : (Printable with type t := B.t) = struct
+  module Make(B : Base) : (Printable with type self := B.self) = struct
     include B
 
-    let show self =
+    let to_string self =
       Format.asprintf "%a" B.pp self
 
     let print self =
@@ -256,149 +267,218 @@ end
 
 
 module type Printable1 = sig
-  type 'a t
+  type 'a self
 
-  val pp : 'a printer -> 'a t printer
+  val pp : 'a printer -> 'a self printer
 
-  val show : 'a printer -> 'a t -> string
+  val to_string : 'a printer -> 'a self -> string
 
-  val print : 'a printer -> 'a t -> unit
+  val print : 'a printer -> 'a self -> unit
 end
 
 
 module Printable1 = struct
   module type Base = sig
-    type 'a t
+    type 'a self
 
-    val pp : 'a printer -> Format.formatter -> 'a t -> unit
+    val pp : 'a printer -> Format.formatter -> 'a self -> unit
   end
 
-  module Make(B : Base) : (Printable1 with type 'a t := 'a B.t) = struct
+  module Make(B : Base) : (Printable1 with type 'a self := 'a B.self) = struct
     include B
 
-    let show : 'a . 'a printer -> 'a B.t -> string =
+    let to_string : 'a . 'a printer -> 'a B.self -> string =
       fun pp1 self -> Format.asprintf "%a" (B.pp pp1) self
 
-    let print : 'a . 'a printer -> 'a B.t -> unit =
+    let print : 'a . 'a printer -> 'a B.self -> unit =
       fun pp1 self -> Format.fprintf Format.std_formatter "%a" (B.pp pp1) self
   end
 end
 
 
 module type Printable2 = sig
-  type ('a, 'b) t
+  type ('a, 'b) self
 
-  val pp : 'a printer -> 'b printer -> ('a, 'b) t printer
+  val pp : 'a printer -> 'b printer -> ('a, 'b) self printer
 
-  val show : 'a printer -> 'b printer -> ('a, 'b) t -> string
+  val to_string : 'a printer -> 'b printer -> ('a, 'b) self -> string
 
-  val print : 'a printer -> 'b printer -> ('a, 'b) t -> unit
+  val print : 'a printer -> 'b printer -> ('a, 'b) self -> unit
 end
 
 
 module Printable2 = struct
   module type Base = sig
-    type ('a, 'b) t
+    type ('a, 'b) self
 
-    val pp : 'a printer -> 'b printer -> ('a, 'b) t printer
+    val pp : 'a printer -> 'b printer -> ('a, 'b) self printer
   end
 
-  module Make(B : Base) :
-    (Printable2 with type ('a, 'b) t := ('a, 'b) B.t) = struct
+  module Make(B : Base) : (Printable2 with type ('a, 'b) self := ('a, 'b) B.self) = struct
 
     include B
 
-    let show : 'a 'b . 'a printer -> 'b printer -> ('a, 'b) B.t -> string =
+    let to_string : 'a 'b . 'a printer -> 'b printer -> ('a, 'b) B.self -> string =
       fun pp1 pp2 self ->
         Format.asprintf "%a" (B.pp pp1 pp2) self
 
-    let print : 'a 'b. 'a printer -> 'b printer -> ('a, 'b) B.t -> unit =
+    let print : 'a 'b. 'a printer -> 'b printer -> ('a, 'b) B.self -> unit =
       fun pp1 pp2 self ->
         Format.fprintf Format.std_formatter "%a" (B.pp pp1 pp2) self
   end
 end
 
 
-module type Hashable = sig
-  type t
+type 'a hasher = 'a -> int
 
-  val hash : t -> int
+module Hasher = struct
+  type 'a self = 'a hasher
+
+  let int x =
+    Pervasives.(x land max_int)
+
+  let char x =
+    Char.code x
+
+  let string x =
+    Hashtbl.hash x
+
+  let pair hash_a hash_b (a, b) =
+    Hashtbl.seeded_hash (hash_a a) (hash_b b)
+end
+
+module type Hashable = sig
+  type self
+
+  val hash : self -> int
 end
 
 module type Hashable1 = sig
-  type 'a t
+  type 'a self
 
-  val hash : ('a -> int) -> 'a t -> int
+  val hash : ('a -> int) -> 'a self -> int
 end
 
 module type Hashable2 = sig
-  type ('a, 'b) t
+  type ('a, 'b) self
 
-  val hash : ('a -> int) -> ('b -> int) -> ('a, 'b) t -> int
+  val hash : ('a -> int) -> ('b -> int) -> ('a, 'b) self -> int
 end
 
 module type Bounded = sig
-  type t
+  type self
 
-  val min_value : t
-  val max_value : t
+  val min_value : self
+  val max_value : self
 end
 
 module type Default = sig
-  type t
+  type self
 
-  val default : t
+  val default : self
 end
 
 module type Default1 = sig
-  type 'a t
+  type 'a self
 
-  val default : 'a t
+  val default : 'a self
 end
 
 module type Enumerable = sig
-  type t
+  type self
 
-  val predecessor : t -> t
-  val successor : t -> t
+  val predecessor : self -> self
+  val successor : self -> self
 end
 
 module type Numeric = sig
-  type t
+  type self
 
-  val ( + ) : t -> t -> t
-  val ( - ) : t -> t -> t
-  val ( * ) : t -> t -> t
-  val (~- ) : t -> t
-  val (~+ ) : t -> t
-  val abs : t -> t
-  val signum : t -> t
-  val of_int : int -> t
+  val ( + ) : self -> self -> self
+  val ( - ) : self -> self -> self
+  val ( * ) : self -> self -> self
+  val (~- ) : self -> self
+  val (~+ ) : self -> self
+  val abs : self -> self
+  val signum : self -> self
+  val of_int : int -> self
 end
 
-module type Parsable = sig
-  type t
+type 'a parser = string -> 'a option
 
-  val parse : string -> t option
+module type Parsable = sig
+  type self
+
+  val parse : string -> self option
 end
 
 module type Parsable1 = sig
-  type 'a t
+  type 'a self
 
-  val parse : (string -> 'a) -> string -> 'a t option
+  val parse : 'a parser -> string -> 'a self option
 end
 
 module type Parsable2 = sig
-  type ('a, 'b) t
+  type ('a, 'b) self
 
-  val parse : (string -> 'a) -> (string -> 'b) -> string -> ('a, 'b) t option
+  val parse : 'a parser -> 'b parser -> string -> ('a, 'b) self option
+end
+
+(* TODO: compound types (lists, tuples, records) may require a custom parser. *)
+module Parser = struct
+  type 'a self = 'a parser
+
+  let expression_desc str =
+    let lexbuf = Lexing.from_string str in
+    let expr = Parse.expression lexbuf in
+    expr.pexp_desc
+
+  open Parsetree
+
+  let int str =
+    match expression_desc str with
+    | Pexp_constant (Pconst_integer (val_str, _)) ->
+      Some (Pervasives.int_of_string val_str)
+    | _ -> None
+
+  let float str =
+    match expression_desc str with
+    | Pexp_constant (Pconst_float (val_str, _)) ->
+      Some (Pervasives.float_of_string val_str)
+    | _ -> None
+
+  let char str =
+    match expression_desc str with
+    | Pexp_constant (Pconst_char c) ->
+      Some c
+    | _ -> None
+
+  let bool str =
+    match expression_desc str with
+    | Pexp_construct ({txt = Lident "true"}, None) ->
+      Some true
+    | Pexp_construct ({txt = Lident "false"}, None) ->
+      Some false
+    | _ -> None
+end
+
+
+module Exception = struct
+  type self = exn
+
+  include Printable.Make(struct
+      type nonrec self = self
+
+      let pp formatter self =
+        Format.fprintf formatter "%s" (Printexc.to_string self)
+    end)
 end
 
 
 (* Unit type and operations *)
 
 module Unit = struct
-  type t = unit
+  type self = unit
 
   let try_of_string = function "()" -> Some () | _ -> None
 
@@ -410,8 +490,8 @@ module Unit = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec t = t
-      let compare (a : t) (b : t) = P.compare a b
+      type nonrec self = self
+      let compare _ _ = Equal
     end)
 
   (* Default *)
@@ -419,8 +499,8 @@ module Unit = struct
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec t = t
-      let equal (a : t) (b : t) = P.( = ) a b
+      type nonrec self = self
+      let equal : self -> self -> bool = Pervasives.(=)
     end)
 
   (* Hashable *)
@@ -433,7 +513,7 @@ module Unit = struct
 
   (* Printable *)
   include Printable.Make(struct
-      type nonrec t = t
+      type nonrec self = self
       let pp fmt () = Format.fprintf fmt "()"
     end)
 end
@@ -442,7 +522,7 @@ end
 (* Boolean type and operations *)
 
 module Bool = struct
-  type t = bool
+  type self = bool
 
   let not = P.not
 
@@ -463,8 +543,14 @@ module Bool = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec t = t
-      let compare (a : t) (b : t) = P.compare a b
+      type nonrec self = self
+
+      let compare a b =
+        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let order = legacy_cmp a b in
+        if order < 0 then Less
+        else if order > 0 then Greater
+        else Equal
     end)
 
   (* Default *)
@@ -481,8 +567,9 @@ module Bool = struct
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec t = t
-      let equal (a : t) (b : t) = P.( = ) a b
+      type nonrec self = self
+
+      let equal : self -> self -> bool = P.(=)
     end)
 
   (* Hashable *)
@@ -497,7 +584,7 @@ module Bool = struct
 
   (* Printable *)
   include Printable.Make(struct
-      type nonrec t = t
+      type nonrec self = self
       let pp = Format.pp_print_bool
     end)
 end
@@ -510,7 +597,7 @@ let ( || ) = Bool.( || )
 (* Integer type and arithmetic operations *)
 
 module Int = struct
-  type t = int
+  type self = int
 
   let ( / ) = P.( / )
 
@@ -533,8 +620,14 @@ module Int = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec t = t
-      let compare (a : t) (b : t) = P.compare a b
+      type nonrec self = self
+
+      let compare a b =
+        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let order = legacy_cmp a b in
+        if order < 0 then Less
+        else if order > 0 then Greater
+        else Equal
     end)
 
   (* Default *)
@@ -555,12 +648,12 @@ module Int = struct
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec t = t
-      let equal (a : t) (b : t) = P.(=) a b
+      type nonrec self = self
+      let equal : self -> self -> bool = P.(=)
     end)
 
   (* Hashable *)
-  let hash x = Hashtbl.hash x
+  let hash = Hasher.int
 
   (* Numeric *)
   let ( + ) = P.( + )
@@ -588,7 +681,7 @@ module Int = struct
 
   (* Printable *)
   include Printable.Make(struct
-      type nonrec t = t
+      type nonrec self = self
       let pp = Format.pp_print_int
     end)
 end
@@ -605,7 +698,7 @@ let abs     = Int.abs
 
 module Float = struct
 
-  type t = float
+  type self = float
 
   let ( / ) = P.( /. )
   let ( mod ) = P.mod_float
@@ -618,11 +711,11 @@ module Float = struct
 
   let round_nearest_lb = -.(2. ** 52.)
   let round_nearest_ub =    2. ** 52.
-  let round t =
-    if t >= round_nearest_lb && t <= round_nearest_ub then
-      floor (t +. 0.49999999999999994)
+  let round self =
+    if self >= round_nearest_lb && self <= round_nearest_ub then
+      floor (self +. 0.49999999999999994)
     else
-    t
+      self
 
   let exp   = P.exp
   let frexp = P.frexp
@@ -649,8 +742,14 @@ module Float = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec t = t
-      let compare (a : t) (b : t) = P.compare a b
+      type nonrec self = self
+
+      let compare a b =
+        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let order = legacy_cmp a b in
+        if order < 0 then Less
+        else if order > 0 then Greater
+        else Equal
     end)
 
   (* Default *)
@@ -658,8 +757,8 @@ module Float = struct
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec t = t
-      let equal (a : t) (b : t) = P.(=) a b
+      type nonrec self = self
+      let equal : self -> self -> bool = P.(=)
     end)
 
   (* Hashable *)
@@ -696,7 +795,7 @@ module Float = struct
 
   (* Printable *)
   include Printable.Make(struct
-      type nonrec t = t
+      type nonrec self = self
       let pp = Format.pp_print_float
     end)
 
@@ -706,13 +805,11 @@ end
 (* Char type and operations *)
 
 module Char = struct
-  type t = char
+  type self = char
 
   let try_of_int x =
-    if x < 0 || x > 255 then
-      None
-    else
-    Some (P.char_of_int x)
+    try Some (Pervasives.char_of_int x)
+    with Invalid_argument _ -> None
 
   let to_int self = P.int_of_char self
 
@@ -733,8 +830,13 @@ module Char = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec t = t
-      let compare (a : t) (b : t) = P.compare a b
+      type nonrec self = self
+      let compare a b =
+        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let order = legacy_cmp a b in
+        if order < 0 then Less
+        else if order > 0 then Greater
+        else Equal
     end)
 
   (* Default *)
@@ -754,11 +856,11 @@ module Char = struct
     fail "Char.successor"
 
   (* Hashable *)
-  let hash x = Hashtbl.hash x
+  let hash x = Hasher.char x
 
   (* Printable *)
   include Printable.Make(struct
-      type nonrec t = t
+      type nonrec self = self
       let pp = Format.pp_print_char
     end)
 end
@@ -766,6 +868,49 @@ end
 
 let char = Char.try_of_int
 let code = Char.to_int
+
+
+module Pair = struct
+  type ('a, 'b) self = 'a * 'b
+    [@@deriving show]
+    [@@public]
+
+  let first  = Pervasives.fst
+  let second = Pervasives.snd
+
+  include Comparable2.Make(struct
+      type nonrec ('a, 'b) self = ('a, 'b) self
+
+      let compare cmp_a cmp_b (self_a, self_b) (other_a, other_b) =
+        match cmp_a self_a other_a with
+        | Equal -> cmp_b self_b other_b
+        | other -> other
+    end)
+
+  let hash = Hasher.pair
+
+  let parse str =
+    undefined ()
+
+  include Printable2.Make(struct
+      type nonrec ('a, 'b) self = ('a, 'b) self
+
+      let pp pp_a pp_b formatter (a, b) =
+        Format.pp_print_string formatter "(";
+        (pp_a formatter) a;
+        Format.pp_print_string formatter ",";
+        (pp_b formatter) b;
+        Format.pp_print_string formatter ")"
+    end)
+end
+
+type ('a, 'b) pair = ('a, 'b) Pair.self
+
+let first  = Pair.first
+let second = Pair.second
+
+(** String operations *)
+let (++) str1 str2 = Pervasives.(str1 ^ str2)
 
 module Bitwise = struct
 
@@ -783,6 +928,7 @@ end
 
 let pass () = ()
 let ( |> ) = P.( |> )
+let ( @ ) = P.( @@ )
 let identity x = x
 let constantly x _ = x
 let flip f x y = f y x
@@ -829,20 +975,55 @@ let result f default self =
 
 
 
-type ('a, 'b) pair = 'a * 'b
-
-(* Tuple operations *)
-let first  = Pervasives.fst
-let second = Pervasives.snd
-
-
 (* Either type *)
 type ('a, 'b) either = Left of 'a | Right of 'b
+
+let left  a = Left  a
+let right b = Right b
 
 
 let int = Int.of_float
 let float = Float.of_int
 
 
+let open_file ?(binary = true) path =
+  let flags = [Open_rdonly] in
+  let flags = if binary then Open_binary :: flags else flags in
+  open_in_gen flags 0o000 path
+
+let create_file
+    ?(binary = true) ?(append = false)
+    ?(exclusive = false) ?(perm = 00666) path =
+  let flags = [Open_wronly; Open_creat] in
+  let flags = (if binary then Open_binary else Open_text) :: flags in
+  let flags = (if append then Open_append else Open_trunc) :: flags in
+  let flags = (if exclusive then Open_excl :: flags else flags) in
+  open_out_gen flags perm path
+
+
+module Generic = struct
+  let compare a b =
+    let legacy_cmp : 'a -> 'a -> int = Pervasives.compare in
+    let order = legacy_cmp a b in
+    if order < 0 then
+      Less
+    else
+    if order > 0 then
+      Greater
+    else
+      Equal
+
+  let equal = Pervasives.( = )
+
+  let ( == ) = Pervasives.( =  )
+  let ( != ) = Pervasives.( <> )
+  let ( <  ) = Pervasives.( <  )
+  let ( >  ) = Pervasives.( >  )
+  let ( <= ) = Pervasives.( <= )
+  let ( >= ) = Pervasives.( >= )
+
+  let min = Pervasives.min
+  let max = Pervasives.max
+end
 
 
