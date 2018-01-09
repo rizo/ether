@@ -1,11 +1,10 @@
 # Ether — The base element
 
-> **Status:** Unreleased
-
 *Ether* is small base library for OCaml designed from the ground up for
 consistent, safe and user-friendly development experience.
 
-- *API Reference*: <http://odis.io/docs/ether/Ether>
+- **API Reference**: <http://odis.io/docs/ether/Ether>
+- **Status:** Unreleased
 
 
 ### Goals
