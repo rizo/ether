@@ -32,7 +32,6 @@
     {- {{: #hashing} Hashing}}
     {- {{: #data_types} Data Types}}
     {- {{: #control_abstractions} Control Abstractions}}
-    {- {{: #io} Input/Output}}
     {- {{: #generic_definitions} Generic Definitions}}
     {- {{: #comparison_to_pervasives} Comparison to Pervasives}}}
 
@@ -67,21 +66,21 @@
 
 {[
 module type Comparable = sig
-  type self
+  type t
 
   (* Required operation. *)
-  val compare : self -> self -> order
+  val compare : t -> t -> order
 
   (* Derived operations. *)
-  val equal  : self -> self -> bool
-  val ( == ) : self -> self -> bool
-  val ( != ) : self -> self -> bool
-  val ( <  ) : self -> self -> bool
-  val ( >  ) : self -> self -> bool
-  val ( <= ) : self -> self -> bool
-  val ( >= ) : self -> self -> bool
-  val min    : self -> self -> self
-  val max    : self -> self -> self
+  val equal  : t -> t -> bool
+  val ( == ) : t -> t -> bool
+  val ( != ) : t -> t -> bool
+  val ( <  ) : t -> t -> bool
+  val ( >  ) : t -> t -> bool
+  val ( <= ) : t -> t -> bool
+  val ( >= ) : t -> t -> bool
+  val min    : t -> t -> t
+  val max    : t -> t -> t
 end
 ]}
 
@@ -94,13 +93,13 @@ end
 module Comparable : sig
   (* The minimal required implementation. *)
   module type Base = sig
-    type self
+    type t
 
-    val compare : self -> self -> order
+    val compare : t -> t -> order
   end
 
   (* Generates the derived operations given the [Base] module. *)
-  module Make(B : Base) : (Comparable with type self := B.self)
+  module Make(B : Base) : (Comparable with type t := B.t)
 end
 ]}
 
@@ -124,20 +123,19 @@ type person = {
 }
 
 module Person : sig
-  type self = person
+  type t = person
 
-  val say_hello : self -> unit
+  val say_hello : t -> unit
 
-  (* Age-based comparison. *)
-  include Comparable with type self := self
+  include Comparable with type t := t
 end = struct
-  type self = person
+  type t = person
 
   let say_hello self =
     print "Hello, %s!" self.name
 
   include Comparable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
 
       let compare self other =
         Int.compare self.age other.age
@@ -173,21 +171,24 @@ let () =
 
 *)
 
+type 'a equal = 'a -> 'a -> bool
+(** The type for equality functions. *)
+
 (** Nullary signature for equality comparisons which are equivalence relations.
 
     [Equatable.Base] is the minimal implementation of the [Equatable] instance.
     Some examples of nullary equatable types, {i i.e.}, types without
     parameters include: [int], [float], [char]. *)
 module type Equatable = sig
-  type self
+  type t
   (** The type of the equatable monomorphic values, {i i.e.}, non-polymorphic
       nullary values, such as [int], [char], etc. *)
 
-  val equal : self -> self -> bool
+  val equal : t equal
 
-  val ( == ) : self -> self -> bool
+  val ( == ) : t equal
 
-  val ( != ) : self -> self -> bool
+  val ( != ) : t equal
 end
 
 
@@ -195,12 +196,12 @@ end
     signature and a functor to build the extended signature. *)
 module Equatable : sig
   module type Base = sig
-    type self
+    type t
 
-    val equal : self -> self -> bool
+    val equal : t equal
   end
 
-  module Make(B : Base) : (Equatable with type self := B.self)
+  module Make(B : Base) : (Equatable with type t := B.t)
   (** Functor building an instance of {!Equatable} given a {!Equatable.Base}
       implementation. *)
 end
@@ -216,21 +217,19 @@ end
     If desired, the generic infix functions can be used with the default
     {!equal} implementation. *)
 module type Equatable1 = sig
-  type 'a self
+  type 'a t
 
-  val equal : ('a -> 'a -> bool) -> 'a self -> 'a self -> bool
+  val equal : 'a equal -> 'a t -> 'a t -> bool
 end
 
 
 (** Binary signature for equality comparisons which are equivalence relations. *)
 module type Equatable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
 
   val equal :
-    ('a -> 'a -> bool) ->
-    ('b -> 'b -> bool) ->
-    ('a, 'b) self ->
-    ('a, 'b) self -> bool
+    'a equal -> 'b equal ->
+    ('a, 'b) t -> ('a, 'b) t -> bool
 end
 
 
@@ -278,17 +277,17 @@ type 'a comparator = 'a -> 'a -> order
     instance. Some examples of nullary comparable types, i.e., types with one
     parameter, include: [int], [char], [string], {i etc}. *)
 module type Comparable = sig
-  type self
+  type t
 
-  include Equatable with type self := self
+  include Equatable with type t := t
 
-  val compare : self comparator
-  val ( <  ) : self -> self -> bool
-  val ( >  ) : self -> self -> bool
-  val ( <= ) : self -> self -> bool
-  val ( >= ) : self -> self -> bool
-  val min : self -> self -> self
-  val max : self -> self -> self
+  val compare : t comparator
+  val ( <  ) : t -> t -> bool
+  val ( >  ) : t -> t -> bool
+  val ( <= ) : t -> t -> bool
+  val ( >= ) : t -> t -> bool
+  val min : t -> t -> t
+  val max : t -> t -> t
 end
 
 
@@ -296,12 +295,12 @@ end
     signature and a functor to build the extended signature. *)
 module Comparable : sig
   module type Base = sig
-    type self
+    type t
 
-    val compare : self comparator
+    val compare : t comparator
   end
 
-  module Make(B : Base) : (Comparable with type self := B.self)
+  module Make(B : Base) : (Comparable with type t := B.t)
   (** Functor building an instance of {!Comparable} given a {!Comparable.Base}
       implementation. *)
 end
@@ -316,13 +315,13 @@ end
     If desired, the generic infix functions can be used with the default
     {!compare} implementation. *)
 module type Comparable1 = sig
-  type 'a self
+  type 'a t
 
-  val compare : 'a comparator -> 'a self -> 'a self -> order
+  val compare : 'a comparator -> 'a t -> 'a t -> order
 
-  val min : 'a comparator -> 'a self -> 'a self -> 'a self
+  val min : 'a comparator -> 'a t -> 'a t -> 'a t
 
-  val max : 'a comparator -> 'a self -> 'a self -> 'a self
+  val max : 'a comparator -> 'a t -> 'a t -> 'a t
 end
 
 
@@ -330,12 +329,12 @@ end
     signature and a functor to build the extended signature. *)
 module Comparable1 : sig
   module type Base = sig
-    type 'a self
+    type 'a t
 
-    val compare : 'a comparator -> 'a self -> 'a self -> order
+    val compare : 'a comparator -> 'a t -> 'a t -> order
   end
 
-  module Make(B : Base) : (Comparable1 with type 'a self := 'a B.self)
+  module Make(B : Base) : (Comparable1 with type 'a t := 'a B.t)
   (** Functor building an instance of {!Comparable1} given a
       {!Comparable1.Base} implementation. *)
 end
@@ -343,19 +342,19 @@ end
 
 (** Binary comparable signature for types that form a total order. *)
 module type Comparable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
 
   val compare :
     'a comparator -> 'b comparator ->
-    ('a, 'b) self -> ('a, 'b) self -> order
+    ('a, 'b) t -> ('a, 'b) t -> order
 
   val min :
     'a comparator -> 'b comparator ->
-    ('a, 'b) self -> ('a, 'b) self -> ('a, 'b) self
+    ('a, 'b) t -> ('a, 'b) t -> ('a, 'b) t
 
   val max :
     'a comparator -> 'b comparator ->
-    ('a, 'b) self -> ('a, 'b) self -> ('a, 'b) self
+    ('a, 'b) t -> ('a, 'b) t -> ('a, 'b) t
 end
 
 
@@ -363,14 +362,14 @@ end
     signature and a functor to build the extended signature. *)
 module Comparable2 : sig
   module type Base = sig
-    type ('a, 'b) self
+    type ('a, 'b) t
 
     val compare :
-    'a comparator -> 'b comparator ->
-      ('a, 'b) self -> ('a, 'b) self -> order
+      'a comparator -> 'b comparator ->
+      ('a, 'b) t -> ('a, 'b) t -> order
   end
 
-  module Make(B : Base) : (Comparable2 with type ('a, 'b) self := ('a, 'b) B.self)
+  module Make(B : Base) : (Comparable2 with type ('a, 'b) t := ('a, 'b) B.t)
   (** Functor building an instance of {!Comparable2} given a
       {!Comparable2.Base} implementation. *)
 end
@@ -383,22 +382,22 @@ end
 type 'a printer = Format.formatter -> 'a -> unit
 (** The type for pretty-printers of values of type ['a]. *)
 
-val print : ?output: out_channel -> ?break:string ->
-  ('a, Format.formatter, unit, unit) format4 -> 'a
+val print : ?channel:out_channel -> ?break:string ->
+  ('a, Format.formatter, unit) format -> 'a
 (** [print ?output ?break fmt] prints the text formatted accordingly to [fmt]
     on the [output] channel followed by [break].
 
     {3 Parameters}
 
-    @param output The output channel to write on (default = [stdout]).
+    @param channel The output channel to write on (default = [stdout]).
     @param break String to be appended at the end (default = ["\n"]).
 
     {3 Examples}
 {[
 print "hello";
-print "hello, world" ~break:"!!!\n";
+print "hello, world" ~break:"!\n";
 print "hello, %s!" "world";
-print ~output:stderr "hello";
+print ~channel:stderr "hello";
 ]} *)
 
 val format : ('a, Format.formatter, unit, string) format4 -> 'a
@@ -408,9 +407,7 @@ val format : ('a, Format.formatter, unit, string) format4 -> 'a
     The format string is a character string which contains two types of
     objects: plain characters, which are simply copied to the output channel,
     and conversion specifications, each of which causes conversion and printing
-    of arguments. For more details see the {!Format} module.
-
-    It is an alias for [Format.asprintf].
+    of arguments.
 
 {[
 assert (format "x = %d" 42 = "x = 42");
@@ -424,19 +421,19 @@ assert (format "Hello, %s!" world = "Hello, world!");
     Some examples of nullary printable types, i.e., types without parameters
     include: [Int.t], [Float.t], [Char.t], [Unit.t], etc. *)
 module type Printable = sig
-  type self
+  type t
   (** The type of the printable monomorphic values, i.e., non-polymorphic
       nullary values, such as [int], [string], etc. *)
 
-  val pp : self printer
-  (** [pp] is the pretty-printer for the type {!t}. *)
+  val printer : t printer
+  (** [printer] is the pretty-printer for the type {!t}. *)
 
-  val to_string : self -> string
+  val to_string : t -> string
   (** [to_string self] converts [self] to a string representation using the
-      {!pp} pretty-printer. *)
+      {!printer} pretty-printer. *)
 
-  val print : self -> unit
-  (** [print self] writes [self] to the standard output using the {!pp}
+  val print : t -> unit
+  (** [print self] writes [self] to the standard output using the {!printer}
       pretty-printer. *)
 end
 
@@ -445,15 +442,15 @@ end
     signature and a functor to build the extended signature. *)
 module Printable : sig
   module type Base = sig
-    type self
+    type t
     (** The type of the printable monomorphic values, i.e., non-polymorphic
         nullary values, such as [int], [string], etc. *)
 
-    val pp : self printer
-    (** [pp] is the pretty-printer for the type {!self}. *)
+    val printer : t printer
+    (** [printer] is the pretty-printer for the type {!t}. *)
   end
 
-  module Make(B : Base) : (Printable with type self := B.self)
+  module Make(B : Base) : (Printable with type t := B.t)
   (** Functor building an instance of {!Printable} given a {!Printable.Base}
       implementation. *)
 end
@@ -465,21 +462,23 @@ end
     instance. Some examples of unary printable types, {i i.e.}, types with one
     parameter, include: {!option}, {!list}, {!array}. *)
 module type Printable1 = sig
-  type 'a self
+  type 'a t
   (** The type of the printable polymorphic values of arity one, i.e., values
       with one type parameter, such as ['a list], ['a option], etc. *)
 
-  val pp : 'a printer -> 'a self printer
-  (** [pp pp_a] is the pretty-printer for the unary type ['a t]. [pp_a] is the
-      pretty-printer for the wrapped type ['a]. *)
+  val printer : 'a printer -> 'a t printer
+  (** [printer printer_a] is the pretty-printer for the unary type ['a t].
+      [printer_a] is the pretty-printer for the wrapped type ['a]. *)
 
-  val to_string : 'a printer -> 'a self -> string
-  (** [to_string pp_a self] converts unary {!'a t} to a string representation
-      using {!pp_a} for the wrapped type. *)
+  val to_string : 'a printer -> 'a t -> string
+  (** [to_string printer_a self] converts unary {!'a t} to a string representation
+      using {!printer_a} for the wrapped type. *)
 
-  val print : 'a printer -> 'a self -> unit
-  (** [print pp_a self] writes [self] to the standard output using [pp_a]
-      pretty-printer for the wrapped type and {!Printable1.pp} for [self]. *)
+  val print : 'a printer -> 'a t -> unit
+  (** [print printer_a self] writes [self] to the standard output using
+      [printer_a] pretty-printer for the wrapped type and {!Printable1.printer}
+      for [self].
+  *)
 end
 
 
@@ -487,15 +486,15 @@ end
     signature and a functor to build the extended signature. *)
 module Printable1 : sig
   module type Base = sig
-    type 'a self
+    type 'a t
     (** The type of the printable polymorphic values of arity one, i.e., values
         with one type parameter, such as ['a list], ['a option], etc. *)
 
-    val pp : 'a printer -> Format.formatter -> 'a self -> unit
-    (** [pp] is the pretty-printer for the type {!t}. *)
+    val printer : 'a printer -> Format.formatter -> 'a t -> unit
+    (** [printer printer_a] is the pretty-printer for the type {!'a t}. *)
   end
 
-  module Make(B : Base) : (Printable1 with type 'a self := 'a B.self)
+  module Make(B : Base) : (Printable1 with type 'a t := 'a B.t)
   (** Functor building an instance of {!Printable1} given a {!Printable1.Base}
       implementation. *)
 end
@@ -507,22 +506,22 @@ end
     instances. Some examples of binary printable types, i.e., types with two
     parameters, include: {!('a, 'e) Result.t} and {!('a, 'b) Either.t}. *)
 module type Printable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
   (** The type of the printable polymorphic values of arity two, i.e., values
       with two type parameters, such as [('a, 'e) Result.t] and [('a, 'b)
       Either.t]. *)
 
-  val pp : 'a printer -> 'b printer -> ('a, 'b) self printer
-  (** [pp pp_a pp_b] is the pretty-printer for the binary type [('a, 'b) t].
-      [pp_a] and [pp_b] are the pretty-printers for the wrapped types ['a] and
-      ['b]. *)
+  val printer : 'a printer -> 'b printer -> ('a, 'b) t printer
+  (** [printer printer_a printer_b] is the pretty-printer for the binary type
+      [('a, 'b) t]. [printer_a] and [printer_b] are the pretty-printers for
+      the wrapped types ['a] and ['b]. *)
 
-  val to_string : 'a printer -> 'b printer -> ('a, 'b) self -> string
+  val to_string : 'a printer -> 'b printer -> ('a, 'b) t -> string
   (** [to_string pp_a pp_b self] converts binary [('a, 'b) t] to a string
       representation using [pp_a] and [pp_b] for the wrapped types ['a] and
       ['b]. *)
 
-  val print : 'a printer -> 'b printer -> ('a, 'b) self -> unit
+  val print : 'a printer -> 'b printer -> ('a, 'b) t -> unit
   (** [print pp_a pp_b self] writes [self] to the standard output using [pp_a]
       and [pp_b] pretty-printers for the wrapped types and {!Printable1.pp} for
       [self]. *)
@@ -533,18 +532,18 @@ end
     signature and a functor to build the extended signature. *)
 module Printable2 : sig
   module type Base = sig
-    type ('a, 'b) self
+    type ('a, 'b) t
     (** The type of the printable polymorphic values of arity two, i.e., values
         with two type parameters, such as [('a, 'e) Result.t] and [('a, 'b)
         Either.t]. *)
 
-    val pp : 'a printer -> 'b printer -> ('a, 'b) self printer
-    (** [pp pp_a pp_b] is the pretty-printer for the binary type [('a, 'b) t].
-        [pp_a] and [pp_b] are the pretty-printers for the wrapped types ['a] and
-        ['b]. *)
+    val printer : 'a printer -> 'b printer -> ('a, 'b) t printer
+    (** [printer printer_a printer_b] is the pretty-printer for the binary type
+        [('a, 'b) t]. [printer_a] and [printer_b] are the pretty-printers for
+        the wrapped types ['a] and ['b]. *)
   end
 
-  module Make(B : Base) : (Printable2 with type ('a, 'b) self := ('a, 'b) B.self)
+  module Make(B : Base) : (Printable2 with type ('a, 'b) t := ('a, 'b) B.t)
   (** Functor building an instance of {!Printable2} given a {!Printable2.Base}
       implementation. *)
 end
@@ -564,7 +563,7 @@ type person =
   { name : string; age : int }
 
 module Person = struct
-  type self = person
+  type t = person
 
   let hash self =
     Pair.hash String.hash Int.hash (self.name, self.age)
@@ -579,81 +578,36 @@ type 'a hasher = 'a -> int
     type ['a] generate an integer representing a hash. *)
 
 module Hasher : sig
-  type 'a self = 'a hasher
+  type 'a t = 'a hasher
 
   val int : int hasher
   val char : char hasher
   val string : string hasher
   val pair : 'a hasher -> 'b hasher -> ('a * 'b) hasher
+  val list : 'a hasher -> 'a list hasher
 end
 
 (** Interface for nullary hashable types. *)
 module type Hashable = sig
-  type self
+  type t
 
-  val hash : self hasher
+  val hash : t hasher
 end
 
 
 (** Interface for unary hashable types. *)
 module type Hashable1 = sig
-  type 'a self
+  type 'a t
 
-  val hash : 'a hasher -> 'a self hasher
+  val hash : 'a hasher -> 'a t hasher
 end
 
 
 (** Interface for binary hashable types. *)
 module type Hashable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
 
-  val hash : 'a hasher -> 'b hasher -> ('a, 'b) self hasher
-end
-
-
-(** {1:parsing Parsing}
-
-    Valid OCaml literals can be read from their textual representation with the
-    [Parsable] interface.
-
-    The [Parser] module includes helper combinators to parse compound types
-    such as records and lists. *)
-
-type 'a parser = string -> 'a option
-(** The type of parsing functions, {i i.e.}, functions that given a string
-    produce values of type ['a], if the string represents a valid value. *)
-
-module Parser : sig
-  type 'a self = 'a parser
-
-  val int : int parser
-
-  val float : float parser
-
-  val char : char parser
-end
-
-(** Interface for nullary types that can be parsed. *)
-module type Parsable = sig
-  type self
-
-  val parse : self parser
-end
-
-
-(** Interface for unary types that can be parsed. *)
-module type Parsable1 = sig
-  type 'a self
-
-  val parse : 'a parser -> 'a self parser
-end
-
-
-(** Interface for binary types that can be parsed. *)
-module type Parsable2 = sig
-  type ('a, 'b) self
-
-  val parse : 'a parser -> 'b parser -> ('a, 'b) self parser
+  val hash : 'a hasher -> 'b hasher -> ('a, 'b) t hasher
 end
 
 
@@ -661,39 +615,39 @@ end
 
 (* Bounded is used to name the upper and lower limits of a type. *)
 module type Bounded = sig
-  type self
+  type t
 
-  val min_value : self
-  val max_value : self
+  val min_value : t
+  val max_value : t
 end
 
 
 (** Interface for nullary types with a default value. *)
 module type Default = sig
-  type self
+  type t
 
-  val default : self
+  val default : t
 end
 
 
 (** Interface for unary types with a default value. *)
 module type Default1 = sig
-  type 'a self
+  type 'a t
 
-  val default : 'a self
+  val default : 'a t
 end
 
 
 (** Enumerable defines operations on sequentially ordered types. *)
 module type Enumerable = sig
-  type self
+  type t
 
-  val predecessor : self -> self
+  val predecessor : t -> t
   (** [pred self] is the predecessor of [self].
 
       @raise No_value if [self] has no predecessor. *)
 
-  val successor : self -> self
+  val successor : t -> t
   (** [succ self] is the successor of [self].
 
       @raise No_value if [self] has no successor. *)
@@ -702,20 +656,72 @@ end
 
 (** Basic numeric interface. *)
 module type Numeric = sig
-  type self
+  type t
 
-  val ( + ) : self -> self -> self
-  val ( - ) : self -> self -> self
-  val ( * ) : self -> self -> self
-  val (~- ) : self -> self
-  val (~+ ) : self -> self
-  val abs : self -> self
-  val signum : self -> self
-  val of_int : int -> self
+  val ( + ) : t -> t -> t
+  val ( - ) : t -> t -> t
+  val ( * ) : t -> t -> t
+  val (~- ) : t -> t
+  val (~+ ) : t -> t
+  val abs : t -> t
+  val signum : t -> t
 end
 
 
 (** {1:exn Exceptions} *)
+
+(** Module definition for the exception type. *)
+module Exception : sig
+  type t = exn
+
+  val raise : ?trace: bool -> exn -> 'a
+  (** [raise ?trace exn] raises the exception [exn]. If [trace] is [false] no
+      backtrace will be recorded, resulting in faster execution.
+
+{[
+let ensure_negative x =
+  if x < 0 then
+    raise ~trace:false (Invalid_argument "negative value")
+  else x
+]} *)
+
+  val raises : ?only: exn -> (unit -> 'a) -> bool
+  (** [raises ?only:exn f] is [true] if the exception [exn] is raised while calling
+      [f], [false] otherwise. If no [exn] is given, will return [true] on any
+      exception.
+
+{[
+assert (raises (fun () -> fail "yes"));
+assert (raises (fun () -> Option.force None) ~only:No_value);
+assert (not (raises (fun () -> "no")))
+]} *)
+
+  val fail : string -> 'a
+  (** [fail msg] raises the [Failure] exception with given [msg]. Should be used
+      for generic failures with a simple message.
+
+{[
+if List.length a = 0 then
+  fail "empty list"
+else
+  print "non-empty"
+]} *)
+
+  val bracket : (unit -> 'a) -> ('a -> unit) -> ('a -> 'b) -> 'b
+  (** Provides a safe way to acquire, use and release a resource.
+
+      [bracket make free f] is [f (make ())] where the value produced by [make]
+      is released with [free]. The resource will be closed even if [f] raises an
+      exception.
+
+{[
+bracket
+  (open_file "data.csv") close_input
+  (fun input -> ...)
+]} *)
+
+  include Printable with type t := t
+end
 
 val raise : ?trace: bool -> exn -> 'a
 (** [raise ?trace exn] raises the exception [exn]. If [trace] is [false] no
@@ -750,6 +756,20 @@ else
   print "non-empty"
 ]} *)
 
+val bracket : (unit -> 'a) -> ('a -> unit) -> ('a -> 'b) -> 'b
+(** Provides a safe way to acquire, use and release a resource.
+
+    [bracket make free f] is [f (make ())] where the value produced by [make]
+    is released with [free]. The resource will be closed even if [f] raises an
+    exception.
+
+{[
+bracket
+  (open_file "data.csv") close_input
+  (fun input -> ...)
+]} *)
+
+
 exception Undefined
 (** An exception for undefined or not implemented code branches. *)
 
@@ -764,13 +784,6 @@ match x with
 | x when x < 0 -> "-"
 | otherwise    -> undefined ()
 ]} *)
-
-(** Module definition for the exception type. *)
-module Exception : sig
-  type self = exn
-
-  include Printable  with type self := self
-end
 
 
 (** {1:data_types Data Types}
@@ -792,54 +805,60 @@ end
     Global type names should be used ({i i.e.} types outside modules) unless
     the module is used as a namespace. For example, [request] is preferred to
     [Request.t], but [Request.status] is acceptable. In this case the global
-    [request] type should also be aliased as [Request.self]. This convention
+    [request] type should also be aliased as [Request.t]. This convention
     makes the usage of types more consistent (avoids mixing module-defined
     types like [Some_type.t] with simple types [some_type]) and allows direct
     access to the field and variant members of the frequently used types.
 
-    {b Meta:} This needs to be reviewed since globally defined types can also
-    pollute the global namespace with conflicting fields/variants. An
-    alternative is to start by defining the type in a module and export it
-    after the definition (potentially by redefining publicly the body). *)
+    {b Note:} Globally defined types can pollute the global namespace with
+    conflicting fields/variants. If this happens the types should be moved into
+    modules containing accessor functions for record fields and constructor
+    functions for vairants. *)
 
 
 (** Unit type and operations. *)
 module Unit : sig
-  type self = unit
+  type t = unit
 
-  (** {2:implemented_instances Implemented instances} *)
+  val try_of_string : string -> t option
+  (** [try_of_string str] is a unit value converted from the string [str] or
+      [None] if the string does not represent a valid unit. *)
 
-  include Bounded    with type self := self
-  include Comparable with type self := self
-  include Default    with type self := self
-  include Hashable   with type self := self
-  include Parsable   with type self := self
-  include Printable  with type self := self
+  (** {2 Implemented instances} *)
+  include Bounded    with type t := t
+  include Comparable with type t := t
+  include Default    with type t := t
+  include Hashable   with type t := t
+  include Printable  with type t := t
 end
 
 
 (** Boolean type and operations. *)
 module Bool : sig
-  type self = bool
+  type t = bool
   (** Standard boolean type. *)
 
-  val not : self -> self
+  val not : t -> t
   (** [not a] is the boolean negation of [a]. *)
 
-  val ( && ) : self -> self -> self
+  val ( && ) : t -> t -> t
   (** [a && b] is the boolean 'and' of [a] and [b]. Evaluation is sequential,
       left-to-right, [a] is evaluated first, and if it returns [false], [b] is
       not evaluated at all. *)
 
-  val ( || ) : self -> self -> self
+  val ( || ) : t -> t -> t
   (** [a || b] is the boolean 'or' of [a] and [b]. Evaluation is sequential,
       left-to-right, [a] is evaluated first, and if it returns [true], [b] is
       not evaluated at all. *)
 
-  val of_int : int -> bool
-  val to_int : bool -> int
+  val of_int : int -> t
+  val to_int : t -> int
 
-  val to_option : 'a -> self -> 'a option
+  val try_of_string : string -> t option
+  (** [try_of_string str] is a boolean value converted from the string [str] or
+      [None] if the string does not represent a valid boolean. *)
+
+  val to_option : 'a -> t -> 'a option
   (** [to_option x self] is an optional value containing [x] if [self] is
       [true] and [None] otherwise.
 
@@ -849,15 +868,27 @@ assert (Bool.to_option 42 true  == Some 42);
 ]} *)
 
   (** {6 Implemented instances} *)
-  include Bounded    with type self := self
-  include Comparable with type self := self
-  include Default    with type self := self
-  include Enumerable with type self := self
-  include Equatable  with type self := self
-  include Hashable   with type self := self
-  include Parsable   with type self := self
-  include Printable  with type self := self
+  include Bounded    with type t := t
+  include Comparable with type t := t
+  include Default    with type t := t
+  include Enumerable with type t := t
+  include Equatable  with type t := t
+  include Hashable   with type t := t
+  include Printable  with type t := t
 end
+
+val not : bool -> bool
+(** [not a] is the boolean negation of [a]. *)
+
+val ( && ) : bool -> bool -> bool
+(** [a && b] is the boolean 'and' of [a] and [b]. Evaluation is sequential,
+    left-to-right, [a] is evaluated first, and if it returns [false], [b] is
+    not evaluated at all. *)
+
+val ( || ) : bool -> bool -> bool
+(** [a || b] is the boolean 'or' of [a] and [b]. Evaluation is sequential,
+    left-to-right, [a] is evaluated first, and if it returns [true], [b] is
+    not evaluated at all. *)
 
 
 (** Integer type and arithmetic operations.
@@ -865,96 +896,128 @@ end
     Integer numbers with 31 bits on 32-bit processors or 63 bits on 64-bit
     processors. *)
 module Int : sig
-  type self = int
+  type t = int
   (** Standard integer type. *)
 
-  val ( / ) : self -> self -> self
+  val ( / ) : t -> t -> t
   (* Integer devision. *)
 
-  val ( mod ) : self -> self -> self
+  val ( mod ) : t -> t -> t
+  (** Integer reminder.
+
+      If [y] is not zero, the result of [x mod y] satisfies the following
+      properties: [x = (x / y) * y + x mod y] and [abs(x mod y) <= abs(y) - 1].
+      If [y = 0], [x mod y] raises [Division_by_zero].
+
+      {b Note:} [x mod y] is negative only if [x < 0].
+      @raise Division_by_zero if [y] is zero. *)
 
   (** {6:conv Conversion } *)
 
-  val to_string : self -> string
+  val to_string : t -> string
   (** [to_string x] is a string representation of the integer [x]. *)
 
-  val of_float : float -> int
+  val of_float : float -> t
   (** [of_float x] is an integer representation of the float value [x]. *)
 
-  val of_char : char -> int
+  val of_char : char -> t
   (** [of_char x] is an integer representation of the char value [x].
 
       See [Char.try_of_int] *)
 
+  val try_of_string : string -> t option
+  (** [try_of_string str] is a int value converted from the string [str] or
+      [None] if the string does not represent a valid int. *)
+
   module Unsafe : sig
-    val of_string : string -> int
+    val of_string : string -> t
     (** [of_string str] is an integer created by parsing the string [str].
 
         @raise Failure if the string does not represent a valid integer. *)
   end
 
   (** {6 Implemented instances} *)
-  include Bounded    with type self := self
-  include Comparable with type self := self
-  include Default    with type self := self
-  include Enumerable with type self := self
-  include Equatable  with type self := self
-  include Hashable   with type self := self
-  include Numeric    with type self := self
-  include Parsable   with type self := self
-  include Printable  with type self := self
+  include Bounded    with type t := t
+  include Comparable with type t := t
+  include Default    with type t := t
+  include Enumerable with type t := t
+  include Equatable  with type t := t
+  include Hashable   with type t := t
+  include Numeric    with type t := t
+  include Printable  with type t := t
 end
+
+val int : float -> int
+(** [int x] is an integer representation of the float value [x]. *)
+
+val ( / ) : int -> int -> int
+(* Integer devision. *)
+
+val ( mod ) : int -> int -> int
+(** Integer reminder.
+
+    If [y] is not zero, the result of [x mod y] satisfies the following
+    properties: [x = (x / y) * y + x mod y] and [abs(x mod y) <= abs(y) - 1].
+    If [y = 0], [x mod y] raises [Division_by_zero].
+
+    {b Note:} [x mod y] is negative only if [x < 0].
+    @raise Division_by_zero if [y] is zero. *)
+
+include Numeric with type t := int
+include Comparable with type t := int
 
 
 (** Float type and arithmetic operations.
 
     Floating-point numbers according to IEEE 754, using double precision 64
-    bits numbers. *)
+    bits numbers.
+
+    When working with floating-point values. *)
 module Float : sig
-  type self = float
+  type t = float
 
-  val ( / ) : self -> self -> self
+  val ( / ) : t -> t -> t
 
-  val ( mod ) : self -> self -> self
+  val ( mod ) : t -> t -> t
 
-  val infinity : float
+  val infinity : t
   (** Positive infinity. *)
 
-  val neg_infinity : float
+  val neg_infinity : t
   (** Negative infinity. *)
 
-  val nan : float
+  val nan : t
   (** A special floating-point value denoting the result of an undefined
       operation such as [0.0 /. 0.0]. Stands for 'not a number'. Any
       floating-point operation with [nan] as argument returns [nan] as result.
       As for floating-point comparisons, [=], [<], [<=], [>] and [>=] return
       [false] and [<>] returns [true] if one or both of their arguments is [nan]. *)
 
-  val epsilon : float
+  val epsilon : t
   (** The difference between [1.0] and the smallest exactly representable
       floating-point number greater than [1.0]. *)
 
-  val round : float -> float
-  (** [round f] rounds the float value to the nearest integer float. *)
+  val round : t -> t
+  (** [round self] rounds the float value to the nearest integer float. *)
 
-  val exp : float -> float
+  val exp : t -> t
   (** Exponential. *)
 
-  val frexp : float -> float * int
-  (** [frexp f] returns the pair of the significant and the exponent of [f]. When
-      [f] is zero, the significant [x] and the exponent [n] of [f] are equal to
-      zero.  When [f] is non-zero, they are defined by [f = x *. 2 ** n] and [0.5
-      <= x < 1.0]. *)
+  val frexp : t -> t * int
+  (** [frexp self] returns the pair of the significant and the exponent of
+      [self]. When [self] is zero, the significant [x] and the exponent [n] of
+      [self] are equal to zero.  When [self] is non-zero, they are defined by
+      [self = x *. 2 ** n] and [0.5 <= x < 1.0]. *)
 
-  val ldexp : float -> int -> float
-  (** [ldexp x n] returns [x *. 2 ** n]. *)
+  val ldexp : t -> int -> t
+  (** [ldexp self n] returns [self *. 2 ** n]. *)
 
-  val modf : float -> float * float
-  (** [modf f] returns the pair of the fractional and integral part of [f]. *)
+  val modf : t -> t * t
+  (** [modf self] returns the pair of the fractional and integral part of [self]. *)
 
   type fpclass = Pervasives.fpclass
   (** The five classes of floating-point numbers, as determined by
-      the {!Pervasives.classify_float} function. *)
+      the {!classify} function. *)
 
   val classify : float -> fpclass
   (** Return the class of the given floating-point number:
@@ -962,34 +1025,39 @@ module Float : sig
 
   (** {2:conv Conversion } *)
 
-  val to_int : float -> int
+  val to_int : t -> int
   (** Truncate the given floating-point number to an integer. The result is
       unspecified if the argument is [nan] or falls outside the range of
       representable integers. *)
 
-  val to_string : float -> string
+  val of_int : int -> t
+  (** Converts an integer to floating-point. *)
 
-  val try_of_string : string -> float option
+  val to_string : t -> string
+
+  val try_of_string : string -> t option
   (** [try_of_string str] is a float value converted from the string [str] or
       [None] if the string does not represent a valid float. *)
 
   module Unsafe : sig
-    val of_string : string -> float
+    val of_string : string -> t
     (** [of_string str] is a float created by parsing the string [str].
 
         @raise Failure if the string does not represent a valid integer. *)
   end
 
   (** {6 Implemented instances} *)
-  include Bounded    with type self := self
-  include Comparable with type self := self
-  include Default    with type self := self
-  include Equatable  with type self := self
-  include Hashable   with type self := self
-  include Numeric    with type self := self
-  include Parsable   with type self := self
-  include Printable  with type self := self
+  include Bounded    with type t := t
+  include Comparable with type t := t
+  include Default    with type t := t
+  include Equatable  with type t := t
+  include Hashable   with type t := t
+  include Numeric    with type t := t
+  include Printable  with type t := t
 end
+
+val float : int -> Float.t
+(** Converts an integer to floating-point. *)
 
 
 (** Char type and operations.
@@ -998,21 +1066,24 @@ end
 module Char : sig
   (** Char type and operations. *)
 
-  type self = char
+  type t = char
   (** The type for bytes. *)
 
   (** {2:conversions Conversions} *)
 
-  val try_of_int : int -> self option
+  val try_of_int : int -> t option
   (** [try_of_int b] is a byte from [b]. [None] is returned if [b] is not in
       the range \[[0x00];[0xFF]\]. *)
 
-  val to_int : self -> int
-  (** [to_int b] is the byte [b] as an integer. *)
+  val to_int : t -> int
+  (** [to_int self] is the byte [self] as an integer. *)
 
+  val try_of_string : string -> t option
+  (** [try_of_string str] is a char value converted from the string [str] or
+      [None] if the string does not represent a valid char. *)
 
   module Unsafe : sig
-    val of_int : int -> self
+    val of_int : int -> t
     (** [of_int b] is a byte from [b].
 
         {e See also:} [Char.of_int]
@@ -1022,15 +1093,20 @@ module Char : sig
 
   (** {2 Implemented instances} *)
 
-  include Bounded    with type self := self
-  include Comparable with type self := self
-  include Default    with type self := self
-  include Enumerable with type self := self
-  include Equatable  with type self := self
-  include Hashable   with type self := self
-  include Parsable   with type self := self
-  include Printable  with type self := self
+  include Bounded    with type t := t
+  include Comparable with type t := t
+  include Default    with type t := t
+  include Enumerable with type t := t
+  include Equatable  with type t := t
+  include Hashable   with type t := t
+  include Printable  with type t := t
 end
+
+val char : int -> char option
+(** Public alias for {!Char.try_of_int}. *)
+
+val code : char -> int
+(** Public alias for {!Char.to_int}. *)
 
 
 (** {2:string_operations String Operations} *)
@@ -1132,159 +1208,50 @@ val ( >> )  : ('a -> 'b) -> ('b -> 'c) -> 'a -> 'c
 (** [g >> f] is infix version of [compose f g]. *)
 
 
-(** {2:pair Pair Type and Operations} *)
+(** {2:tuples Tuple types and Operations} *)
 
 (** A tuple with two values. *)
 module Pair : sig
-  type ('a, 'b) self = 'a * 'b
+  type ('a, 'b) t = 'a * 'b
   (** The type of tuples with two values. *)
 
-  val first : ('a, 'b) self -> 'a
-  (** [first pair] is the first elements of the [pair]
+  val first : ('a, 'b) t -> 'a
+  (** [first self] is the first elements of [self].
 
 {[
 assert (first (1, "x") = 1)
 ]} *)
 
-  val second : ('a, 'b) self -> 'b
-  (** [second pair] is the second elements of the [pair]
+  val second : ('a, 'b) t -> 'b
+  (** [second self] is the second elements of [self].
 
 {[
 assert (second (1, "x") = "x")
 ]} *)
 
-  include Comparable2 with type ('a, 'b) self := ('a, 'b) self
-  include Hashable2   with type ('a, 'b) self := ('a, 'b) self
-  include Parsable2   with type ('a, 'b) self := ('a, 'b) self
-  include Printable2  with type ('a, 'b) self := ('a, 'b) self
+  include Comparable2 with type ('a, 'b) t := ('a, 'b) t
+  include Hashable2   with type ('a, 'b) t := ('a, 'b) t
+  include Printable2  with type ('a, 'b) t := ('a, 'b) t
 end
 
-type ('a, 'b) pair = ('a, 'b) Pair.self
-(** Public alias for [Pair] type. *)
+module Tuple2 = Pair
+(** Alias for [Pair]. *)
+
+type ('a, 'b) pair = ('a, 'b) Pair.t
+(** The type of tuples with two values. *)
 
 val first : ('a, 'b) pair -> 'a
-(** Public alias for {!Pair.first}. *)
+(** [first self] is the first elements of [self].
+
+{[
+assert (first (1, "x") = 1)
+]} *)
 
 val second : ('a, 'b) pair -> 'b
-(** Public alias for {!Pair.second}. *)
-
-
-(* {2:option Option Type and Operations}
-
-    Option represents an optional value: an [option] can be either [Some] and
-    contain a value or a [None], and do not.
-
-type nonrec 'a option = 'a option
-(** The type of optional values ['a]. *)
-
-val some : 'a -> 'a option
-(** [some x] wraps [x] in a [Some] option value. *)
-
-val none : 'a option
-(** [none] is the [None] option value. *)
-
-val is_some : 'a option -> bool
-(** [is_some opt] is [true] if the option is a [Some] value. *)
-
-val is_none : 'a option -> bool
-(** [is_none opt] is [true] if the option is a [None] value. *)
-
-val option : ('a -> 'b) -> 'b -> 'a option -> 'b
-(** [case f default self] is [f] applied to the [Some] value of [self],
-    or [default] if [self] is [None].
+(** [second self] is the second elements of [self].
 
 {[
-assert (None    |> option ((+) 1) 0 = 0);
-assert (Some 42 |> option ((+) 1) 0 = 43);
-]} *)
-
-
-(** {2:result Result Type and Operations} *)
-
-type nonrec ('a, 'e) result = ('a, 'e) result
-(** A result is either [Ok] meaning the computation succeeded, or it is an
-    [Error] meaning that there was some failure. *)
-
-val ok : 'a -> ('a, 'e) result
-(** [ok x] creates an [Ok] result with value [x]. *)
-
-val error : 'e -> ('a, 'e) result
-(** [error x] creates an [Error] result with value [x]. *)
-
-val is_ok : ('a, 'e) result -> bool
-(** [is_ok res] is [true] if the result value is an [Ok]. *)
-
-val is_error : ('a, 'e) result -> bool
-(** [is_error res] is [true] if the result value is an [Error]. *)
-
-val result : ('a -> 'b) -> ('e -> 'b) -> ('a, 'e) result -> 'b
-(** A view function for the {!type:result} type.
-
-    [result on_ok on_error res] is the function application [on_ok x] if [res]
-    is [Ok x], or [on_error e] if [res] is [Error e].
-
-    This function is equivalent to pattern-matching on the structure of the
-    result value. For more information on [view] functions see the
-    {!view_functions} section.
-
-{[
-let use_result =
-  result Int.to_string (fun err -> "Error: " ^ err) in
-assert (Ok 42 |> use_result = "42");
-assert (Error "no value" |> use_result = "Error: no value")
-]} *) *)
-
-
-(** {2:public_exports Public Exports}
-
-    This section exports public definitions from the defined modules aliasing
-    some of the names. *)
-
-val int : float -> int
-(** Public alias for {!val:Int.of_float}. *)
-
-val float : int -> float
-(** Public alias for {!val:Float.of_int}. *)
-
-val char : int -> char option
-(** Public alias for {!Char.try_of_int}. *)
-
-val code : char -> int
-(** Public alias for {!Char.to_int}. *)
-
-val not : bool -> bool
-(** Public alias for {!Bool.not}. *)
-
-val ( && ) : bool -> bool -> bool
-(** Public alias for {!Bool.(&&)}. *)
-
-val ( || ) : bool -> bool -> bool
-(** Public alias for {!Bool.(||)}. *)
-
-
-(** {1:io Input/Output} *)
-
-val open_file : ?binary:bool -> string -> in_channel
-(** [open_file ?binary path] is an input channel for a file at [path].
-
-    Open a file for reading in textual mode:
-{[
-open_file ~binary:false (path "/var/log/system.log")
-]} *)
-
-val create_file : ?binary:bool -> ?append:bool -> ?exclusive:bool ->
-  ?perm:int -> string -> out_channel
-(** [create_file ?binary ?append ?exclusive ?perm path] is an output channel
-    for a file at [path].
-
-    Open a file for appending, create if doesn't exist:
-{[
-create_file ~append:true (path "/tmp/data.txt")
-]}
-
-    Open a file for writing and truncate its content:
-{[
-create_file (path "/tmp/data.txt")
+assert (second (1, "x") = "x")
 ]} *)
 
 
@@ -1410,7 +1377,6 @@ end
     Generic Definitions} for more details.}
     {- Structural equality operators are named [==] and [!=] and physical
     equality can be tested with {{: #val-is} [is]}.}
-    {- The main type of modules/interface is called [self] and not [t].}
     {- Simple type names are preferred, {i e.g.}, [data] instead of [Data.t].}
     {- Interfaces are never named [S], instead a full name is used, like
     [Comparable] or [Hashable]. Additionally a module with the same name is

@@ -1,62 +1,25 @@
 
 module P = Pervasives
 
-(* Exceptions *)
-
-let raise ?(trace = true) self =
-  if trace then
-    P.raise self
-  else
-  P.raise_notrace self
-
-
-let raises ?only:exn f =
-  try
-    P.ignore (f ());
-    false
-  with e -> begin
-      match exn with
-      | Some x -> e = x
-      | None -> true
-    end
-
-let fail = P.failwith
-
-exception Undefined
-
-let undefined () =
-  raise Undefined
-
-let bracket init (free : 'a -> unit) f =
-  let x = init () in
-  try
-    let r = f x in
-    free x;
-    r
-  with exn ->
-    free x;
-    raise exn
-
-
-(* Comparisons and Ordering *)
+type 'a equal = 'a -> 'a -> bool
 
 module type Equatable = sig
-  type self
+  type t
 
-  val equal : self -> self -> bool
-  val (==)  : self -> self -> bool
-  val (!=)  : self -> self -> bool
+  val equal : t -> t -> bool
+  val (==)  : t -> t -> bool
+  val (!=)  : t -> t -> bool
 end
 
 
 module Equatable = struct
   module type Base = sig
-    type self
+    type t
 
-    val equal : self -> self -> bool
+    val equal : t -> t -> bool
   end
 
-  module Make(B : Base) : (Equatable with type self := B.self) = struct
+  module Make(B : Base) : (Equatable with type t := B.t) = struct
     include B
 
     let (==)  a b = equal a b
@@ -66,18 +29,18 @@ end
 
 
 module type Equatable1 = sig
-  type 'a self
+  type 'a t
 
-  val equal : ('a -> 'a -> bool) -> 'a self -> 'a self -> bool
+  val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
 end
 
 
 module type Equatable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
 
   val equal :
     ('a -> 'a -> bool) ->
-    ('b -> 'b -> bool) -> ('a, 'b) self -> ('a, 'b) self -> bool
+    ('b -> 'b -> bool) -> ('a, 'b) t -> ('a, 'b) t -> bool
 end
 
 
@@ -89,30 +52,30 @@ type order =
 type 'a comparator = 'a -> 'a -> order
 
 module type Comparable = sig
-  type self
+  type t
 
-  include Equatable with type self := self
+  include Equatable with type t := t
 
-  val compare : self -> self -> order
-  val ( <  ) : self -> self -> bool
-  val ( >  ) : self -> self -> bool
-  val ( <= ) : self -> self -> bool
-  val ( >= ) : self -> self -> bool
-  val min : self -> self -> self
-  val max : self -> self -> self
+  val compare : t -> t -> order
+  val ( <  ) : t -> t -> bool
+  val ( >  ) : t -> t -> bool
+  val ( <= ) : t -> t -> bool
+  val ( >= ) : t -> t -> bool
+  val min : t -> t -> t
+  val max : t -> t -> t
 end
 
 
 module Comparable = struct
   module type Base = sig
-    type self
+    type t
 
-    val compare : self -> self -> order
+    val compare : t -> t -> order
   end
 
-  module Make(B : Base) : (Comparable with type self := B.self) = struct
+  module Make(B : Base) : (Comparable with type t := B.t) = struct
     include Equatable.Make(struct
-        type nonrec self = B.self
+        type nonrec t = B.t
         let equal a b =
           match B.compare a b with
           | Equal -> true
@@ -141,25 +104,25 @@ end
 
 
 module type Comparable1 = sig
-  type 'a self
+  type 'a t
 
   val compare :
-    'a comparator -> 'a self -> 'a self -> order
+    'a comparator -> 'a t -> 'a t -> order
 
-  val min : 'a comparator -> 'a self -> 'a self -> 'a self
+  val min : 'a comparator -> 'a t -> 'a t -> 'a t
 
-  val max : 'a comparator -> 'a self -> 'a self -> 'a self
+  val max : 'a comparator -> 'a t -> 'a t -> 'a t
 end
 
 
 module Comparable1 = struct
   module type Base = sig
-    type 'a self
+    type 'a t
 
-    val compare : 'a comparator -> 'a self -> 'a self -> order
+    val compare : 'a comparator -> 'a t -> 'a t -> order
   end
 
-  module Make(B : Base) : (Comparable1 with type 'a self := 'a B.self) = struct
+  module Make(B : Base) : (Comparable1 with type 'a t := 'a B.t) = struct
     let compare = B.compare
 
     let min cmp a b =
@@ -176,34 +139,34 @@ end
 
 
 module type Comparable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
 
   val compare :
     'a comparator -> 'b comparator ->
-    ('a, 'b) self -> ('a, 'b) self ->
+    ('a, 'b) t -> ('a, 'b) t ->
     order
 
   val min :
     'a comparator -> 'b comparator ->
-    ('a, 'b) self -> ('a, 'b) self -> ('a, 'b) self
+    ('a, 'b) t -> ('a, 'b) t -> ('a, 'b) t
 
   val max :
     'a comparator -> 'b comparator ->
-    ('a, 'b) self -> ('a, 'b) self -> ('a, 'b) self
+    ('a, 'b) t -> ('a, 'b) t -> ('a, 'b) t
 end
 
 
 module Comparable2 = struct
   module type Base = sig
-    type ('a, 'b) self
+    type ('a, 'b) t
 
     val compare :
       'a comparator -> 'b comparator ->
-      ('a, 'b) self -> ('a, 'b) self ->
+      ('a, 'b) t -> ('a, 'b) t ->
       order
   end
 
-  module Make(B : Base) : Comparable2 with type ('a, 'b) self := ('a, 'b) B.self = struct
+  module Make(B : Base) : Comparable2 with type ('a, 'b) t := ('a, 'b) B.t = struct
     let compare = B.compare
 
     let min cmp_a cmp_b a b =
@@ -227,9 +190,9 @@ type 'a printer = Format.formatter -> 'a -> unit
 
 let format = Format.asprintf
 
-let print ?(output = Pervasives.stdout) ?(break = "\n") fmt =
+let print ?(channel = Pervasives.stdout) ?(break = "\n") fmt =
   let open Format in
-  let formatter = formatter_of_out_channel output in
+  let formatter = formatter_of_out_channel channel in
   let pp_break formatter =
     pp_print_string formatter break;
     pp_print_flush formatter () in
@@ -237,94 +200,96 @@ let print ?(output = Pervasives.stdout) ?(break = "\n") fmt =
 
 
 module type Printable = sig
-  type self
+  type t
 
-  val pp : self printer
+  val printer : t printer
 
-  val to_string : self -> string
+  val to_string : t -> string
 
-  val print : self -> unit
+  val print : t -> unit
 end
 
 
 module Printable = struct
   module type Base = sig
-    type self
+    type t
 
-    val pp : self printer
+    val printer : t printer
   end
 
-  module Make(B : Base) : (Printable with type self := B.self) = struct
+  module Make(B : Base) : (Printable with type t := B.t) = struct
     include B
 
     let to_string self =
-      Format.asprintf "%a" B.pp self
+      Format.asprintf "%a" B.printer self
 
     let print self =
-      Format.fprintf Format.std_formatter "%a" B.pp self
+      Format.fprintf Format.std_formatter "%a@." B.printer self
   end
 end
 
 
 module type Printable1 = sig
-  type 'a self
+  type 'a t
 
-  val pp : 'a printer -> 'a self printer
+  val printer : 'a printer -> 'a t printer
 
-  val to_string : 'a printer -> 'a self -> string
+  val to_string : 'a printer -> 'a t -> string
 
-  val print : 'a printer -> 'a self -> unit
+  val print : 'a printer -> 'a t -> unit
 end
 
 
 module Printable1 = struct
   module type Base = sig
-    type 'a self
+    type 'a t
 
-    val pp : 'a printer -> Format.formatter -> 'a self -> unit
+    val printer : 'a printer -> Format.formatter -> 'a t -> unit
   end
 
-  module Make(B : Base) : (Printable1 with type 'a self := 'a B.self) = struct
+  module Make(B : Base) : (Printable1 with type 'a t := 'a B.t) = struct
     include B
 
-    let to_string : 'a . 'a printer -> 'a B.self -> string =
-      fun pp1 self -> Format.asprintf "%a" (B.pp pp1) self
+    let to_string : 'a . 'a printer -> 'a B.t -> string =
+      fun printer1 self ->
+      Format.asprintf "%a" (B.printer printer1) self
 
-    let print : 'a . 'a printer -> 'a B.self -> unit =
-      fun pp1 self -> Format.fprintf Format.std_formatter "%a" (B.pp pp1) self
+    let print : 'a . 'a printer -> 'a B.t -> unit =
+      fun printer1 self ->
+        Format.fprintf Format.std_formatter "%a@." (B.printer printer1) self
   end
 end
 
 
 module type Printable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
 
-  val pp : 'a printer -> 'b printer -> ('a, 'b) self printer
+  val printer : 'a printer -> 'b printer -> ('a, 'b) t printer
 
-  val to_string : 'a printer -> 'b printer -> ('a, 'b) self -> string
+  val to_string : 'a printer -> 'b printer -> ('a, 'b) t -> string
 
-  val print : 'a printer -> 'b printer -> ('a, 'b) self -> unit
+  val print : 'a printer -> 'b printer -> ('a, 'b) t -> unit
 end
 
 
 module Printable2 = struct
   module type Base = sig
-    type ('a, 'b) self
+    type ('a, 'b) t
 
-    val pp : 'a printer -> 'b printer -> ('a, 'b) self printer
+    val printer : 'a printer -> 'b printer -> ('a, 'b) t printer
   end
 
-  module Make(B : Base) : (Printable2 with type ('a, 'b) self := ('a, 'b) B.self) = struct
+  module Make(B : Base) : (Printable2 with type ('a, 'b) t := ('a, 'b) B.t) = struct
 
     include B
 
-    let to_string : 'a 'b . 'a printer -> 'b printer -> ('a, 'b) B.self -> string =
-      fun pp1 pp2 self ->
-        Format.asprintf "%a" (B.pp pp1 pp2) self
+    let to_string : 'a 'b . 'a printer -> 'b printer -> ('a, 'b) B.t -> string =
+      fun printer1 printer2 self ->
+        Format.asprintf "%a" (B.printer printer1 printer2) self
 
-    let print : 'a 'b. 'a printer -> 'b printer -> ('a, 'b) B.self -> unit =
-      fun pp1 pp2 self ->
-        Format.fprintf Format.std_formatter "%a" (B.pp pp1 pp2) self
+    let print : 'a 'b. 'a printer -> 'b printer -> ('a, 'b) B.t -> unit =
+      fun printer1 printer2 self ->
+        Format.fprintf Format.std_formatter "%a@." (B.printer printer1 printer2) self
   end
 end
 
@@ -332,7 +297,7 @@ end
 type 'a hasher = 'a -> int
 
 module Hasher = struct
-  type 'a self = 'a hasher
+  type 'a t = 'a hasher
 
   let int x =
     Pervasives.(x land max_int)
@@ -348,137 +313,120 @@ module Hasher = struct
 end
 
 module type Hashable = sig
-  type self
+  type t
 
-  val hash : self -> int
+  val hash : t -> int
 end
 
 module type Hashable1 = sig
-  type 'a self
+  type 'a t
 
-  val hash : ('a -> int) -> 'a self -> int
+  val hash : ('a -> int) -> 'a t -> int
 end
 
 module type Hashable2 = sig
-  type ('a, 'b) self
+  type ('a, 'b) t
 
-  val hash : ('a -> int) -> ('b -> int) -> ('a, 'b) self -> int
+  val hash : ('a -> int) -> ('b -> int) -> ('a, 'b) t -> int
 end
 
 module type Bounded = sig
-  type self
+  type t
 
-  val min_value : self
-  val max_value : self
+  val min_value : t
+  val max_value : t
 end
 
 module type Default = sig
-  type self
+  type t
 
-  val default : self
+  val default : t
 end
 
 module type Default1 = sig
-  type 'a self
+  type 'a t
 
-  val default : 'a self
+  val default : 'a t
 end
 
 module type Enumerable = sig
-  type self
+  type t
 
-  val predecessor : self -> self
-  val successor : self -> self
+  val predecessor : t -> t
+  val successor : t -> t
 end
 
 module type Numeric = sig
-  type self
+  type t
 
-  val ( + ) : self -> self -> self
-  val ( - ) : self -> self -> self
-  val ( * ) : self -> self -> self
-  val (~- ) : self -> self
-  val (~+ ) : self -> self
-  val abs : self -> self
-  val signum : self -> self
-  val of_int : int -> self
+  val ( + ) : t -> t -> t
+  val ( - ) : t -> t -> t
+  val ( * ) : t -> t -> t
+  val (~- ) : t -> t
+  val (~+ ) : t -> t
+  val abs : t -> t
+  val signum : t -> t
+  val of_int : int -> t
 end
-
-type 'a parser = string -> 'a option
-
-module type Parsable = sig
-  type self
-
-  val parse : string -> self option
-end
-
-module type Parsable1 = sig
-  type 'a self
-
-  val parse : 'a parser -> string -> 'a self option
-end
-
-module type Parsable2 = sig
-  type ('a, 'b) self
-
-  val parse : 'a parser -> 'b parser -> string -> ('a, 'b) self option
-end
-
-(* TODO: compound types (lists, tuples, records) may require a custom parser. *)
-module Parser = struct
-  type 'a self = 'a parser
-
-  let expression_desc str =
-    let lexbuf = Lexing.from_string str in
-    let expr = Parse.expression lexbuf in
-    expr.pexp_desc
-
-  open Parsetree
-
-  let int str =
-    match expression_desc str with
-    | Pexp_constant (Pconst_integer (val_str, _)) ->
-      Some (Pervasives.int_of_string val_str)
-    | _ -> None
-
-  let float str =
-    match expression_desc str with
-    | Pexp_constant (Pconst_float (val_str, _)) ->
-      Some (Pervasives.float_of_string val_str)
-    | _ -> None
-
-  let char str =
-    match expression_desc str with
-    | Pexp_constant (Pconst_char c) ->
-      Some c
-    | _ -> None
-
-  let bool str =
-    match expression_desc str with
-    | Pexp_construct ({txt = Lident "true"}, None) ->
-      Some true
-    | Pexp_construct ({txt = Lident "false"}, None) ->
-      Some false
-    | _ -> None
-end
-
 
 module Exception = struct
-  type self = exn
+  type t = exn
+
+  let raise ?(trace = true) self =
+    if trace then
+      P.raise self
+    else
+    P.raise_notrace self
+
+  let fail = P.failwith
+
+  let bracket make (free : 'a -> unit) f =
+    let x = make () in
+    try
+      let r = f x in
+      free x;
+      r
+    with exn ->
+      free x;
+      raise exn
 
   include Printable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
 
-      let pp formatter self =
+      let printer formatter self =
         Format.fprintf formatter "%s" (Printexc.to_string self)
     end)
 end
 
 
+(* Exceptions *)
+let raise = Exception.raise
+
+let raises ?only:exn f =
+  try
+    P.ignore (f ());
+    false
+  with e -> begin
+      match exn with
+      | Some x -> e = x
+      | None -> true
+    end
+
+let fail = Exception.fail
+
+exception Undefined
+
+let undefined () =
+  raise Undefined
+
+let bracket = Exception.bracket
+
+
+
 (* Unit type and operations *)
 
 module Unit = struct
-  type self = unit
+  type t = unit
 
   let try_of_string = function "()" -> Some () | _ -> None
 
@@ -490,7 +438,7 @@ module Unit = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
       let compare _ _ = Equal
     end)
 
@@ -499,22 +447,17 @@ module Unit = struct
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec self = self
-      let equal : self -> self -> bool = Pervasives.(=)
+      type nonrec t = t
+      let equal : t -> t -> bool = Pervasives.(=)
     end)
 
   (* Hashable *)
   let hash = Hashtbl.hash
 
-  (* Parsable *)
-  let parse = function
-  | "()" -> Some ()
-  | _ -> None
-
   (* Printable *)
   include Printable.Make(struct
-      type nonrec self = self
-      let pp fmt () = Format.fprintf fmt "()"
+      type nonrec t = t
+      let printer fmt () = Format.fprintf fmt "()"
     end)
 end
 
@@ -522,7 +465,7 @@ end
 (* Boolean type and operations *)
 
 module Bool = struct
-  type self = bool
+  type t = bool
 
   let not = P.not
 
@@ -531,6 +474,12 @@ module Bool = struct
 
   let to_int = function false -> 0 | true -> 1
   let of_int = function 0 -> false | _ -> true
+
+  let try_of_string str =
+    try
+      Some (P.bool_of_string str)
+    with _ ->
+      None
 
   let to_option default self =
     match self with
@@ -543,10 +492,10 @@ module Bool = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
 
       let compare a b =
-        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let legacy_cmp : t -> t -> int = Pervasives.compare in
         let order = legacy_cmp a b in
         if order < 0 then Less
         else if order > 0 then Greater
@@ -558,34 +507,27 @@ module Bool = struct
 
   (* Enumerable *)
   let predecessor = function
-  | true  -> false
-  | false -> fail "Bool.predecessor"
+    | true  -> false
+    | false -> fail "Bool.predecessor"
 
   let successor = function
-  | true  -> fail "Bool.successor"
-  | false -> true
+    | true  -> fail "Bool.successor"
+    | false -> true
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
 
-      let equal : self -> self -> bool = P.(=)
+      let equal : t -> t -> bool = P.(=)
     end)
 
   (* Hashable *)
   let hash = Hashtbl.hash
 
-  (* Parsable *)
-  let parse str =
-    try
-      Some (P.bool_of_string str)
-    with _ ->
-      None
-
   (* Printable *)
   include Printable.Make(struct
-      type nonrec self = self
-      let pp = Format.pp_print_bool
+      type nonrec t = t
+      let printer = Format.pp_print_bool
     end)
 end
 
@@ -597,7 +539,7 @@ let ( || ) = Bool.( || )
 (* Integer type and arithmetic operations *)
 
 module Int = struct
-  type self = int
+  type t = int
 
   let ( / ) = P.( / )
 
@@ -610,6 +552,12 @@ module Int = struct
 
   let of_float = P.int_of_float
 
+  let try_of_string s =
+    try
+      Some (P.int_of_string s)
+    with _ ->
+      None
+
   module Unsafe = struct
     let of_string = P.int_of_string
   end
@@ -620,10 +568,10 @@ module Int = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
 
       let compare a b =
-        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let legacy_cmp : t -> t -> int = Pervasives.compare in
         let order = legacy_cmp a b in
         if order < 0 then Less
         else if order > 0 then Greater
@@ -648,8 +596,8 @@ module Int = struct
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec self = self
-      let equal : self -> self -> bool = P.(=)
+      type nonrec t = t
+      let equal : t -> t -> bool = P.(=)
     end)
 
   (* Hashable *)
@@ -672,33 +620,20 @@ module Int = struct
 
   let of_int x = x
 
-  (* Parsable *)
-  let parse s =
-    try
-      Some (Unsafe.of_string s)
-    with _ ->
-      None
-
   (* Printable *)
   include Printable.Make(struct
-      type nonrec self = self
-      let pp = Format.pp_print_int
+      type nonrec t = t
+      let printer = Format.pp_print_int
     end)
 end
 
-let (~- )   = Int.(~- )
-let (~+ )   = Int.(~+ )
-let ( + )   = Int.( + )
-let ( - )   = Int.( - )
-let ( * )   = Int.( * )
-let ( / )   = Int.( / )
-let ( mod ) = Int.( mod )
-let abs     = Int.abs
+include (Int : Numeric)
+include (Int : Comparable)
 
 
 module Float = struct
 
-  type self = float
+  type t = float
 
   let ( / ) = P.( /. )
   let ( mod ) = P.mod_float
@@ -732,6 +667,12 @@ module Float = struct
   let to_string self =
     string_of_float self
 
+  let try_of_string str =
+    try
+      Some (float_of_string str)
+    with _ ->
+      None
+
   module Unsafe = struct
     let of_string = P.float_of_string
   end
@@ -742,10 +683,10 @@ module Float = struct
 
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
 
       let compare a b =
-        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let legacy_cmp : t -> t -> int = Pervasives.compare in
         let order = legacy_cmp a b in
         if order < 0 then Less
         else if order > 0 then Greater
@@ -757,8 +698,8 @@ module Float = struct
 
   (* Equatable *)
   include Equatable.Make(struct
-      type nonrec self = self
-      let equal : self -> self -> bool = P.(=)
+      type nonrec t = t
+      let equal : t -> t -> bool = P.(=)
     end)
 
   (* Hashable *)
@@ -782,36 +723,32 @@ module Float = struct
     if self = 0.0 then
       0.0
     else
-    nan
-
-  (* Parsable *)
-  let parse str =
-    try
-      Some (float_of_string str)
-    with _ ->
-      None
-
-  let try_of_string = parse
+      nan
 
   (* Printable *)
   include Printable.Make(struct
-      type nonrec self = self
-      let pp = Format.pp_print_float
+      type nonrec t = t
+      let printer = Format.pp_print_float
     end)
-
 end
 
 
 (* Char type and operations *)
 
 module Char = struct
-  type self = char
+  type t = char
 
   let try_of_int x =
     try Some (Pervasives.char_of_int x)
     with Invalid_argument _ -> None
 
   let to_int self = P.int_of_char self
+
+  let try_of_string s =
+    if String.length s = 1 then
+      Some (String.get s 0)
+    else
+      None
 
   module Unsafe = struct
     let of_int = P.char_of_int
@@ -821,18 +758,11 @@ module Char = struct
   let min_value = Unsafe.of_int 0x00
   let max_value = Unsafe.of_int 0xFF
 
-  (* Parsable *)
-  let parse s =
-    if String.length s = 1 then
-      Some (String.get s 0)
-    else
-    None
-
   (* Comparable *)
   include Comparable.Make(struct
-      type nonrec self = self
+      type nonrec t = t
       let compare a b =
-        let legacy_cmp : self -> self -> int = Pervasives.compare in
+        let legacy_cmp : t -> t -> int = Pervasives.compare in
         let order = legacy_cmp a b in
         if order < 0 then Less
         else if order > 0 then Greater
@@ -860,8 +790,8 @@ module Char = struct
 
   (* Printable *)
   include Printable.Make(struct
-      type nonrec self = self
-      let pp = Format.pp_print_char
+      type nonrec t = t
+      let printer = Format.pp_print_char
     end)
 end
 
@@ -871,7 +801,7 @@ let code = Char.to_int
 
 
 module Pair = struct
-  type ('a, 'b) self = 'a * 'b
+  type ('a, 'b) t = 'a * 'b
     [@@deriving show]
     [@@public]
 
@@ -879,7 +809,7 @@ module Pair = struct
   let second = Pervasives.snd
 
   include Comparable2.Make(struct
-      type nonrec ('a, 'b) self = ('a, 'b) self
+      type nonrec ('a, 'b) t = ('a, 'b) t
 
       let compare cmp_a cmp_b (self_a, self_b) (other_a, other_b) =
         match cmp_a self_a other_a with
@@ -889,25 +819,25 @@ module Pair = struct
 
   let hash = Hasher.pair
 
-  let parse str =
-    undefined ()
-
   include Printable2.Make(struct
-      type nonrec ('a, 'b) self = ('a, 'b) self
+      type nonrec ('a, 'b) t = ('a, 'b) t
 
-      let pp pp_a pp_b formatter (a, b) =
+      let printer printer_a printer_b formatter (a, b) =
         Format.pp_print_string formatter "(";
-        (pp_a formatter) a;
+        (printer_a formatter) a;
         Format.pp_print_string formatter ",";
-        (pp_b formatter) b;
+        (printer_b formatter) b;
         Format.pp_print_string formatter ")"
     end)
 end
 
-type ('a, 'b) pair = ('a, 'b) Pair.self
+type ('a, 'b) pair = ('a, 'b) Pair.t
 
 let first  = Pair.first
 let second = Pair.second
+
+module Tuple2 = Pair
+
 
 (** String operations *)
 let (++) str1 str2 = Pervasives.(str1 ^ str2)
@@ -939,66 +869,8 @@ let ( << ) f g = compose f g
 let ( >> ) g f = compose f g
 
 
-type nonrec 'a option = 'a option
-
-let some x = Some x
-let none   = None
-
-let is_some = function Some _ -> true  | None -> false
-let is_none = function Some _ -> false | None -> true
-
-let option f default self =
-  match self with
-  | Some x -> f x
-  | None   -> default
-
-
-type ('a, 'e) result = ('a, 'e) Pervasives.result
-
-let ok     x = Ok x
-let error  e = Error e
-
-let is_ok self =
-  match self with
-  | Ok _    -> true
-  | Error _ -> false
-
-let is_error self =
-  match self with
-  | Ok _    -> false
-  | Error _ -> true
-
-let result f default self =
-  match self with
-  | Ok x    -> f x
-  | Error e -> default e
-
-
-
-(* Either type *)
-type ('a, 'b) either = Left of 'a | Right of 'b
-
-let left  a = Left  a
-let right b = Right b
-
-
 let int = Int.of_float
 let float = Float.of_int
-
-
-let open_file ?(binary = true) path =
-  let flags = [Open_rdonly] in
-  let flags = if binary then Open_binary :: flags else flags in
-  open_in_gen flags 0o000 path
-
-let create_file
-    ?(binary = true) ?(append = false)
-    ?(exclusive = false) ?(perm = 00666) path =
-  let flags = [Open_wronly; Open_creat] in
-  let flags = (if binary then Open_binary else Open_text) :: flags in
-  let flags = (if append then Open_append else Open_trunc) :: flags in
-  let flags = (if exclusive then Open_excl :: flags else flags) in
-  open_out_gen flags perm path
 
 
 module Generic = struct

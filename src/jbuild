@@ -3,7 +3,7 @@
 (library
  ((name Ether)
   (public_name ether)
-  (libraries (ocaml-compiler-libs.bytecomp))
+  (libraries (ocaml-compiler-libs.bytecomp result))
   (wrapped false)
   (modules (Ether))))
 
